@@ -185,6 +185,120 @@ class AquiferParams:
     D_target: float = 30.0
     Q_target: float = 120.0
     M_target: float = 70.0
+# =============================================================================
+# AquiferEnvV2 — step-by-step mechanics (complete guide)
+# =============================================================================
+#
+# PURPOSE
+# -------
+# This environment is a deliberately minimal, transparent RL testbed designed to:
+#   (i) discretize a multi-variable aquifer management state,
+#  (ii) apply a small set of interpretable interventions (actions),
+# (iii) compute a scalar reward that supports tabular Q-learning,
+#  (iv) terminate when management targets are reached or time runs out.
+#
+# INTERNAL STATE (continuous)
+# ---------------------------
+# The environment keeps a continuous state internally:
+#   V = Annual renewable volume (typically fixed per aquifer; from CONAGUA)
+#   A = Availability after extraction (can be negative)
+#   D = Distance from resource to demand center (km)
+#   Q = Demand (L/s)
+#   M = Modeling level / hydrogeological understanding (0..100)
+#
+# In the current code, V is sampled randomly in reset(); later it should be fixed
+# per aquifer (scenario parameter). A, D, Q, M evolve through actions + noise.
+#
+# OBSERVATION (discretized / binned)
+# ---------------------------------
+# The agent DOES NOT observe continuous values. Instead, each variable is mapped
+# into a discrete bin index in [0, n_bins-1] using fixed bin edges:
+#   edges_X = linspace(X_min, X_max, n_bins+1)
+#   x_bin = digitize(x, edges_X) - 1
+#
+# Observation returned by reset()/step() is:
+#   obs = (v_bin, a_bin, d_bin, q_bin, m_bin)
+# and observation_space = MultiDiscrete([n_bins]*5)
+#
+# ACTION SPACE (4 interventions)
+# ------------------------------
+# action 0: leak repair
+#   - decreases Q by leak_repair_delta_Q
+#   - incurs cost_leak
+#
+# action 1: aqueduct
+#   - decreases D by aqueduct_delta_D
+#   - increases Q slightly by aqueduct_delta_Q (operational burden)
+#   - incurs cost_aqueduct
+#
+# action 2: dam / augmentation
+#   - increases A by dam_delta_A
+#   - incurs cost_dam
+#
+# action 3: hydrogeological study
+#   - increases M by study_delta_M
+#   - incurs cost_study
+#
+# STATE UPDATE ORDER IN step()
+# ----------------------------
+# step(action) executes the following sequence:
+#
+# (1) Read current continuous state: (V, A, D, Q, M)
+# (2) Apply deterministic action deltas to A/D/Q/M (V unchanged)
+# (3) Add small Gaussian noise to A/D/Q/M (optional, noise_std)
+# (4) Clip all variables into predefined ranges [min, max]
+# (5) Compute reward from utility change ("shaped reward") minus action cost
+# (6) Check termination criteria (targets reached) and truncation (max_steps)
+# (7) Save next continuous state
+# (8) Return discretized observation, reward, terminated, truncated, info
+#
+# UTILITY FUNCTION (scalar, normalized)
+# -------------------------------------
+# A helper scalar "utility" is computed from normalized variables:
+#   A_n = normalize(A) in [0,1]
+#   M_n = normalize(M) in [0,1]
+#   D_n = normalize(D) in [0,1]
+#   Q_n = normalize(Q) in [0,1]
+#
+# Utility is a linear combination:
+#   utility = +1.0*A_n + 0.8*M_n - 0.7*D_n - 0.7*Q_n
+#
+# REWARD (where it actually is)
+# -----------------------------
+# IMPORTANT: there is no standalone reward() function in the current code.
+# The reward is computed inside step() using "reward shaping":
+#
+#   util_before = utility(current_state)
+#   util_after  = utility(next_state)
+#   shaped      = util_after - util_before
+#
+# Then a small action penalty is applied:
+#   reward = shaped - 0.05*cost
+#
+# Therefore reward is positive if the action improves utility enough to offset cost.
+#
+# TERMINATION AND TRUNCATION
+# --------------------------
+# terminated = True if ALL targets are met simultaneously:
+#   A >= A_target, D <= D_target, Q <= Q_target, M >= M_target
+#
+# truncated = True if steps >= max_steps
+#
+# TABULAR Q-LEARNING PIPELINE
+# ---------------------------
+# - obs (MultiDiscrete) is encoded into a single integer index via encode_state()
+# - Q-table shape: (n_bins^5, n_actions)
+# - epsilon-greedy exploration selects actions during training
+# - Q-learning update:
+#     Q[s,a] <- Q[s,a] + alpha * (r + gamma*max_a' Q[s',a'] - Q[s,a])
+#
+# EVALUATION
+# ----------
+# evaluate_policy() runs greedy actions (argmax Q[s]) over many episodes and reports:
+#   - success_rate: fraction of terminated episodes (targets reached)
+#   - avg_return: average cumulative reward
+#   - avg_steps: average number of steps per episode
+# =============================================================================
 
 
 class AquiferEnvV2(gym.Env):
@@ -250,6 +364,13 @@ class AquiferEnvV2(gym.Env):
         util = (+1.0*A_n + 0.8*M_n - 0.7*D_n - 0.7*Q_n)
         return util
 
+        def _reward(self, prev_state, next_state, cost: float) -> float:
+        util_before = self._utility(*prev_state)
+        util_after  = self._utility(*next_state)
+        shaped = util_after - util_before
+        return shaped - 0.05 * cost
+
+
     def _is_terminal(self, V,A,D,Q,M) -> bool:
         return (A >= self.p.A_target and
                 D <= self.p.D_target and
@@ -309,12 +430,9 @@ class AquiferEnvV2(gym.Env):
         Q = clip(Q, self.p.Q_min, self.p.Q_max)
         M = clip(M, self.p.M_min, self.p.M_max)
 
-        # Compute reward as change in utility (shaped) - cost
-        util_before = self._utility(*self.state_cont)
-        util_after = self._utility(V,A,D,Q,M)
-        shaped = (util_after - util_before)
-
-        reward = shaped - 0.05*cost
+        next_state = (V, A, D, Q, M)
+        reward = self._reward(self.state_cont, next_state, cost)
+        util_after = self._utility(*next_state)  # keep for info/debug
 
         terminated = self._is_terminal(V,A,D,Q,M)
         truncated = (self.steps >= self.p.max_steps)
