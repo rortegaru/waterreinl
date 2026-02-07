@@ -6,6 +6,117 @@ RL Aquifer Prioritization V2.0 (from scratch)
 - Discretized state space (bins)
 - Simple, interpretable reward
 """
+# =============================================================================
+# RL Aquifer Prioritization V2.0 — How the environment works (detailed guide)
+# =============================================================================
+#
+# OVERVIEW
+# --------
+# This file defines a minimal Gymnasium environment + tabular Q-learning.
+# The environment is intentionally simple and transparent:
+#
+#   - The environment stores an internal continuous state (V, A, D, Q, M).
+#   - The agent observes a discretized (binned) version of the state.
+#   - The agent chooses one of 4 actions (interventions).
+#   - Each action changes one or two variables (A, D, Q, M).
+#   - The environment returns:
+#       obs: discretized state (MultiDiscrete bins)
+#       reward: a scalar computed inside step()
+#       terminated: True if targets are met (acceptable management state)
+#       truncated: True if max_steps reached
+#       info: continuous state + current utility
+#
+#
+# STATE VARIABLES (continuous, internal)
+# -------------------------------------
+# V = Annual Volume (renewable groundwater volume)
+# A = Availability (remaining volume after extraction; can be negative)
+# D = Distance (km) between resource and demand center
+# Q = Demand (L/s)
+# M = Modeling (hydrogeological understanding level, 0..100)
+#
+# NOTE:
+# - In this V2.0 draft, V is kept constant within an episode (not changed by actions).
+# - A, D, Q, M are changed by actions + small noise.
+#
+#
+# OBSERVATION (what the agent sees)
+# --------------------------------
+# The observation is NOT the continuous state.
+# It is a discretized (binned) version:
+#
+#   obs = (v_bin, a_bin, d_bin, q_bin, m_bin)
+#
+# Each *_bin is an integer in [0, n_bins-1], produced by to_bin(x, edges).
+#
+# Discretization edges are built with np.linspace(min, max, n_bins+1).
+#
+#
+# ACTIONS (Discrete(4))
+# --------------------
+# Actions represent simple interventions:
+#
+#   0: leak repair            -> reduces demand Q (good), small cost
+#   1: aqueduct               -> reduces distance D (good) but increases Q slightly (ops burden), cost
+#   2: dam / augmentation     -> increases availability A (good), higher cost
+#   3: hydrogeological study  -> increases modeling M (good), cost
+#
+# Each action applies a fixed delta (step size), plus optional Gaussian noise.
+#
+#
+# REWARD (IMPORTANT: where it is computed)
+# ---------------------------------------
+# There is NO separate reward() function.
+# The reward is computed inside AquiferEnvV2.step(action).
+#
+# The environment defines an internal scalar "utility" function:
+#
+#   utility = + wA * A_normalized
+#             + wM * M_normalized
+#             - wD * D_normalized
+#             - wQ * Q_normalized
+#
+# where each variable is normalized into [0,1] using its min/max ranges.
+#
+# In step(), the reward is NOT the absolute utility.
+# Instead it is a *shaped reward* based on utility improvement:
+#
+#   util_before = utility(current_state)
+#   util_after  = utility(next_state)
+#   shaped      = util_after - util_before
+#
+# Then we subtract a small action cost:
+#
+#   reward = shaped - 0.05 * action_cost
+#
+# So: reward is positive if the action improves utility enough to overcome the cost.
+#
+#
+# TERMINATION (done conditions)
+# -----------------------------
+# terminated = True if the state meets all targets:
+#
+#   A >= A_target
+#   D <= D_target
+#   Q <= Q_target
+#   M >= M_target
+#
+# truncated = True if steps >= max_steps
+#
+#
+# WHY SHAPED REWARD?
+# ------------------
+# Using reward = (util_after - util_before) makes learning easier because:
+# - the agent gets immediate feedback for improvement
+# - it does not need to wait until the end of the episode to know it is doing well
+# - it encourages monotonic improvement toward targets
+#
+# If you want "ranking of scenarios" as a final score, you can later switch to:
+# - absolute utility as reward, or
+# - cumulative absolute utility, or
+# - cumulative shaped reward but evaluated under a fixed policy across scenarios
+# =============================================================================
+
 
 from __future__ import annotations
 import math
