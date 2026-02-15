@@ -59,6 +59,21 @@ It reveals which intervention reduces system stress faster under the assumed uti
 ## Running
 
 ```bash
+
 python rl_aquifer_v2_1.py
+
+---
+
+## Documentation
+
+Detailed technical explanation of the model:
+
+- Methodology → [docs/methodology.md](docs/methodology.md)
+- Environment meaning → [docs/environment.md](docs/environment.md)
+- Reward design → [docs/reward_design.md](docs/reward_design.md)
+- Result interpretation → [docs/interpretation.md](docs/interpretation.md)
+
+These documents describe the scientific interpretation of the model and how results should be read.
+
 
 
