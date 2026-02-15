@@ -65,17 +65,15 @@ Install dependencies:
 
 pip install -r requirements.txt
 
-Documentation
+## Documentation
 
 Detailed technical explanation of the model:
 
-Methodology → docs/methodology.md
+- Methodology → [docs/methodology.md](docs/methodology.md)
+- Environment meaning → [docs/environment.md](docs/environment.md)
+- Reward design → [docs/reward_design.md](docs/reward_design.md)
+- Result interpretation → [docs/interpretation.md](docs/interpretation.md)
 
-Environment meaning → docs/environment.md
-
-Reward design → docs/reward_design.md
-
-Result interpretation → docs/interpretation.md
 
 Important scientific note
 
