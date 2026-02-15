@@ -56,6 +56,17 @@ It reveals which intervention reduces system stress faster under the assumed uti
 
 ---
 
+## Running
+
+```bash
+python rl_aquifer_v2_1.py
+```
+## Requirements
+
+Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 ## Documentation
 
 Detailed technical explanation of the model:
@@ -75,16 +86,5 @@ U = +A +0.8M −0.7D −0.7Q
 Changing these weights changes the recommended interventions.
 This repository should be interpreted as a decision-analysis framework, not a hydrological simulator.
 
-## Running
 
-```bash
-python rl_aquifer_v2_1.py
-```
-
-## Requirements
-
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
 
