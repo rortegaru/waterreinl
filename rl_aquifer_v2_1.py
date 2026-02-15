@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RL Aquifer Prioritization V2.0 (from scratch)
+RL Aquifer Prioritization V2.0 _ 1 (from scratch)
 - Gymnasium environment
 - Tabular Q-learning (no neural networks)
 - Discretized state space (bins)
@@ -352,6 +352,18 @@ class AquiferEnvV2(gym.Env):
 
     def _utility(self, V,A,D,Q,M) -> float:
         """
+        Decision utility (not hydrological performance).
+
+        This function encodes management preference assumptions.
+        It does not represent groundwater physics.
+
+        Higher values indicate better management condition,
+        not higher water level.
+
+        Changing weights changes recommended infrastructure strategy.
+        """
+
+        """
         Simple interpretable utility:
           + availability (higher is better)
           + modeling (higher is better)
@@ -369,6 +381,18 @@ class AquiferEnvV2(gym.Env):
         return util
 
     def _reward(self, prev_state, next_state, cost: float) -> float:
+        """
+        Scientific meaning:
+
+        The reward measures marginal improvement between states.
+        Large reward indicates a system far from equilibrium.
+
+        Therefore high reward corresponds to critical aquifers,
+        not healthy ones.
+
+        The agent learns improvement gradient, not final quality.
+        """
+
         util_before = self._utility(*prev_state)
         util_after  = self._utility(*next_state)
         shaped = util_after - util_before
@@ -662,3 +686,4 @@ if __name__ == "__main__":
     df_res.to_excel("priorizacion_completa_acuiferos.xlsx", index=False)
     print("Archivo 'priorizacion_completa_acuiferos.xlsx' generado con éxito.")
 # plt.show()  <-- Comenta esta línea
+
