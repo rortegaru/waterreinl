@@ -1,44 +1,64 @@
-\# WaterReinforcementLearning
+# RL Aquifer Prioritization
 
+Reinforcement Learning environment for prioritizing groundwater management interventions using a transparent tabular Q-learning model.
 
+This project does NOT attempt to simulate hydrology.  
+It evaluates management decisions under a simplified decision utility framework.
 
-Reinforcement Learning environment for prioritizing actions in overexploited aquifers.
+---
 
+## Concept
 
+Each aquifer is described by 5 variables:
 
-\## Installation
+- V: Renewable volume
+- A: Availability after extraction
+- D: Distance to demand center
+- Q: Water demand
+- M: Hydrogeological knowledge level
 
+The agent applies actions (interventions):
 
+0 - Leak repair  
+1 - Aqueduct  
+2 - Dam / augmentation  
+3 - Hydrogeological study  
 
-Create environment:
+The goal is to reach an acceptable management state.
 
+---
 
+## Reward definition
 
-conda create -n waterreinl python=3.10
+The reward is NOT absolute performance.
 
-conda activate waterreinl
+It is improvement:
 
+reward = Utility(next_state) − Utility(current_state) − action_cost
 
+Therefore:
 
-Install dependencies:
+- Large rewards → critical systems (large improvement possible)
+- Small rewards → stable systems
 
+The model prioritizes urgency, not quality.
 
+---
 
-pip install numpy gymnasium matplotlib
+## Interpretation
 
+Final cumulative reward is used as a stress indicator:
 
+Lower return → higher priority aquifer
 
-\## Run
+The RL agent does not decide infrastructure policy.
+It reveals which intervention reduces system stress faster under the assumed utility weights.
 
+---
 
+## Running
 
-python rl\_aquifer\_v2.py
+```bash
+python rl_aquifer_v2_1.py
 
-
-
-\## Output
-
-
-
-The script trains a Q-learning agent and evaluates policy performance.
 
